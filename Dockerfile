@@ -6,8 +6,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Instala o GnuCOBOL e dependências
 RUN apt-get update && \
-    apt-get install -y gnucobol build-essential && \
-    apt-get clean
+    apt-get install -y gnucobol4 build-essential && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Cria diretório de trabalho
 WORKDIR /app
