@@ -1,11 +1,30 @@
+# Dockerfile corrigido para resolver problemas de apt-get
+
 FROM --platform=linux/arm64 ubuntu:20.04 as builder
 
+# Configurar ambiente não interativo para evitar prompts durante a instalação
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Configurar timezone para evitar prompts
+RUN ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
+
+# Atualizar fontes de pacotes e resolver problema de apt-get
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get update -y && \
+    apt-get install -y apt-utils 2>&1 | grep -v "debconf: delaying package configuration"
+
 # Instalando dependências necessárias
-RUN apt-get update && apt-get install -y \
+RUN apt-get install -y \
     build-essential \
-    gnucobol \
     wget \
+    gnupg \
     && rm -rf /var/lib/apt/lists/*
+
+# Instalar GnuCOBOL (comando corrigido)
+RUN apt-get update -y && \
+    apt-get install -y gnucobol || apt-get install -y open-cobol && \
+    rm -rf /var/lib/apt/lists/*
 
 # Diretório de trabalho
 WORKDIR /app
@@ -13,16 +32,21 @@ WORKDIR /app
 # Copia o código fonte COBOL
 COPY hello.cob .
 
-# Compila o programa COBOL
-RUN cobc -x -o hello hello.cob
+# Compila o programa COBOL (com fallback para different compiler name)
+RUN which cobc && cobc -x -o hello hello.cob || \
+    which open-cobol && open-cobol -x -o hello hello.cob
 
 # Segunda etapa da build para uma imagem mais leve
 FROM --platform=linux/arm64 ubuntu:20.04
 
-# Instalando apenas o runtime necessário
-RUN apt-get update && apt-get install -y \
-    libcob4 \
-    && rm -rf /var/lib/apt/lists/*
+# Configurar ambiente não interativo
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Atualizar pacotes de maneira segura
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends \
+    libcob4 || apt-get install -y --no-install-recommends libcob1 && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
