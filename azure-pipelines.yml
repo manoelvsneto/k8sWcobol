@@ -1,0 +1,56 @@
+pool:
+  name: Arm64
+  vmImage: 'ubuntu-20.04'
+
+trigger:
+  - main
+resources:
+  - repo: self
+variables:
+  imagePullSecret: 'regcred'
+
+stages:
+- stage: Build
+  displayName: Build stage
+  jobs:
+  - job: Build
+    displayName: Build
+    steps:
+
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'DockerConnection'
+        repository: 'manoelvsneto/k8swcobol'
+        command: 'buildAndPush'
+        tags: '$(Build.BuildId)'
+        Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+        buildContext: '$(Build.SourcesDirectory)/'
+        arguments: '--platform linux/arm64'
+
+    - task: KubernetesManifest@0
+      displayName: Create imagePullSecret
+      inputs:
+        kubernetesServiceConnection: K8SOracleCloud
+        action: createSecret
+        secretName: $(imagePullSecret)
+        dockerRegistryEndpoint: 'DockerConnection'
+    
+    - task: PublishPipelineArtifact@1
+      displayName: Publish Report
+      inputs:
+        artifact: '_nodeapi'
+        publishLocation: 'pipeline'
+    
+    - task: KubernetesManifest@0
+      displayName: Deploy to Kubernetes cluster
+      inputs:
+        kubernetesServiceConnection: K8SOracleCloud
+        action: deploy
+        manifests: |
+          $(Build.SourcesDirectory)/k8s/deployment.yaml
+          $(Build.SourcesDirectory)/k8s/service.yaml
+          $(Build.SourcesDirectory)/k8s/ingress.yaml
+        imagePullSecrets: |
+          $(imagePullSecret)
+        containers: 'manoelvsneto/k8swcobol:$(Build.BuildId)'
+    
