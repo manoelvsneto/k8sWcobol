@@ -1,0 +1,2 @@
+✅ Hello from COBOL in WSL!
+Press Enter to exit
